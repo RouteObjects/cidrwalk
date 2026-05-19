@@ -1,5 +1,18 @@
 // swift-tools-version: 6.3
 
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the cidrwalk package.
+//
+// Copyright (c) 2026 Craig A. Munro
+//
+// Licensed under the Apache License, Version 2.0.
+// See the LICENSE file for details.
+//
+// SPDX-License-Identifier: Apache-2.0
+//
+//===----------------------------------------------------------------------===//
+
 import PackageDescription
 
 let package = Package(
