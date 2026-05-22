@@ -1,4 +1,7 @@
-# cidrwalk
+<h1 align="left">
+  <img src="Documentation/Assets/cidrwalk-icon.png" alt="cidrwalk icon" width="75" height="75" valign="middle">
+  &nbsp;cidrwalk
+</h1>
 
 `cidrwalk` is a small Swift command-line example built on
 [`swift-cidr`](https://github.com/RouteObjects/swift-cidr). It demonstrates
@@ -12,6 +15,18 @@ The command is intentionally narrow and teaching-oriented:
 
 Both inputs must be from the same IP address family. Reversed input order is
 normalized at the CLI boundary before calling into `swift-cidr`.
+
+## CIDR Aggregation
+
+CIDR summarization converts an inclusive address range, or the envelope around
+two network prefixes, into the smallest ordered set of aligned CIDR prefixes.
+The result may be one prefix when the inputs align cleanly, or several prefixes
+when the range starts or ends inside a larger boundary.
+
+The `addresses` subcommand requires `/32` for IPv4 and `/128` for IPv6 because
+those prefix lengths identify exact host endpoints. The `networks` subcommand
+accepts CIDR network prefixes and summarizes the full envelope that covers both
+inputs, including adjacent, nested, or reversed networks.
 
 ## Usage
 
