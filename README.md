@@ -1,8 +1,9 @@
 # cidrwalk
 
 `cidrwalk` is a small Swift command-line example built on
-[`swift-cidr`](../swift-cidr). It demonstrates CIDR summarization with explicit
-input meaning instead of guessing from loosely typed strings.
+[`swift-cidr`](https://github.com/RouteObjects/swift-cidr). It demonstrates
+CIDR summarization with explicit input meaning instead of guessing from loosely
+typed strings.
 
 The command is intentionally narrow and teaching-oriented:
 
@@ -13,6 +14,14 @@ Both inputs must be from the same IP address family. Reversed input order is
 normalized at the CLI boundary before calling into `swift-cidr`.
 
 ## Usage
+
+Clone the repository and run the executable with SwiftPM:
+
+```bash
+git clone https://github.com/RouteObjects/cidrwalk.git
+cd cidrwalk
+swift run cidrwalk --help
+```
 
 ### Address Endpoints
 

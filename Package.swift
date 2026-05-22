@@ -24,7 +24,7 @@ let package = Package(
         .executable(name: "cidrwalk", targets: ["cidrwalk"]),
     ],
     dependencies: [
-        .package(path: "../swift-cidr"),
+        .package(url: "https://github.com/RouteObjects/swift-cidr.git", from: "0.1.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0"),
     ],
     targets: [

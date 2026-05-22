@@ -1,5 +1,5 @@
 {
-  "originHash" : "3e70ba7e115aa4f74eec0b3b5ecdef2ea7131d7cf7d0c15058709bf911b71f3c",
+  "originHash" : "437194bacd70537175101108715fe184fa39b265c87dbe32aa777de427b8d548",
   "pins" : [
     {
       "identity" : "swift-argument-parser",
@@ -20,6 +20,15 @@
       }
     },
     {
+      "identity" : "swift-cidr",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/RouteObjects/swift-cidr.git",
+      "state" : {
+        "revision" : "ff9e219105fa756df286c7617baaafcb8dd61915",
+        "version" : "0.1.0"
+      }
+    },
+    {
       "identity" : "swift-collections",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-collections.git",
@@ -33,8 +42,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "f71c8d2a5e74a2c6d11a0fbe324774b5d6084237",
-        "version" : "2.99.0"
+        "revision" : "57c0a08a331aaea9f5d7a932ad94ef43be942a95",
+        "version" : "2.100.0"
       }
     },
     {
