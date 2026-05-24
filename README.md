@@ -3,6 +3,9 @@
   &nbsp;cidrwalk
 </h1>
 
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FRouteObjects%2Fcidrwalk%2Fbadge%3Ftype%3Dswift-versions)](https://swiftpackageindex.com/RouteObjects/cidrwalk)
+[![](https://img.shields.io/endpoint?url=https%3A%2F%2Fswiftpackageindex.com%2Fapi%2Fpackages%2FRouteObjects%2Fcidrwalk%2Fbadge%3Ftype%3Dplatforms)](https://swiftpackageindex.com/RouteObjects/cidrwalk)
+
 `cidrwalk` is a small Swift command-line example built on
 [`swift-cidr`](https://github.com/RouteObjects/swift-cidr). It demonstrates
 CIDR summarization with explicit input meaning instead of guessing from loosely
