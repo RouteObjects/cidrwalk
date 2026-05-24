@@ -30,6 +30,16 @@ inputs, including adjacent, nested, or reversed networks.
 
 ## Usage
 
+### Homebrew
+
+Install the released command-line tool from the RouteObjects tap:
+
+```bash
+brew install RouteObjects/tap/cidrwalk
+```
+
+### Build From Source
+
 Clone the repository and run the executable with SwiftPM:
 
 ```bash
