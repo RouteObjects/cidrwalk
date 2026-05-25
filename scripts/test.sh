@@ -12,4 +12,8 @@ swift_test_flags=()
 source "${SCRIPT_DIR}/swift-testing-support.sh"
 append_swift_testing_flags_for_command_line_tools
 
-exec swift test --package-path "${PACKAGE_ROOT}" "${swift_test_flags[@]}" "$@"
+if ((${#swift_test_flags[@]})); then
+    exec swift test --package-path "${PACKAGE_ROOT}" "${swift_test_flags[@]}" "$@"
+else
+    exec swift test --package-path "${PACKAGE_ROOT}" "$@"
+fi

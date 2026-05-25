@@ -51,6 +51,13 @@ cd cidrwalk
 swift run cidrwalk --help
 ```
 
+Check the installed version with either version flag:
+
+```bash
+cidrwalk --version
+cidrwalk -v
+```
+
 ### Address Endpoints
 
 Use `addresses` when the inputs are host endpoints. Prefix notation is required,
