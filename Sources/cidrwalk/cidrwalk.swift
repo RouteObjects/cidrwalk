@@ -17,11 +17,24 @@ import Foundation
 
 @main
 struct CIDRWalk: ParsableCommand {
+    static let version = "0.1.1"
+
     static let configuration = CommandConfiguration(
         commandName: "cidrwalk",
         abstract: "Summarize IPv4 or IPv6 CIDR inputs into the smallest ordered prefix set.",
         subcommands: [Addresses.self, Networks.self]
     )
+
+    @Flag(
+        name: [.customShort("v"), .customLong("version")],
+        help: "Show the cidrwalk version."
+    )
+    var showVersion = false
+
+    mutating func run() throws {
+        guard showVersion else { return }
+        print(Self.version)
+    }
 }
 
 struct Addresses: ParsableCommand {

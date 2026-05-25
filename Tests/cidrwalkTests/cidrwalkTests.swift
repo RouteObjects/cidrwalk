@@ -14,6 +14,20 @@
 import Testing
 @testable import cidrwalk
 
+@Test("Root command exposes release version")
+func rootCommandExposesReleaseVersion() {
+    #expect(CIDRWalk.version == "0.1.1")
+}
+
+@Test("Root command accepts long and short version flags")
+func rootCommandAcceptsVersionFlags() throws {
+    let long = try CIDRWalk.parse(["--version"])
+    let short = try CIDRWalk.parse(["-v"])
+
+    #expect(long.showVersion)
+    #expect(short.showVersion)
+}
+
 @Test("Addresses command summarizes IPv4 host endpoints as a line list")
 func addressesSummarizesIPv4HostEndpointsAsList() throws {
     let startAddress = try CIDRWalk.parseHostEndpoint("192.168.1.1/32", label: "start")
