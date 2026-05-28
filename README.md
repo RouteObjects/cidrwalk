@@ -126,6 +126,23 @@ swift run cidrwalk addresses 192.168.1.1/32 192.168.1.189/32 --output json
 }
 ```
 
+### Tree
+
+Tree output is available with `--output tree`. Indentation is based on
+prefix-length depth within the summarized result; it is a teaching
+visualization, not a proportional address-space diagram.
+
+```bash
+swift run cidrwalk addresses 192.0.2.1/32 192.0.2.6/32 --output tree
+```
+
+```text
+192.0.2.1/32
+             192.0.2.2/31
+             192.0.2.4/31
+192.0.2.6/32
+```
+
 ## Testing
 
 Use the repository test wrapper:

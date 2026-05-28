@@ -49,7 +49,7 @@ struct Addresses: ParsableCommand {
     @Argument(help: "The other IPv4 /32 or IPv6 /128 endpoint.")
     var end: String
 
-    @Option(name: .shortAndLong, help: "Output format: list or json.")
+    @Option(name: .shortAndLong, help: "Output format: list, json, or tree.")
     var output: OutputFormat = .list
 
     mutating func run() throws {
@@ -76,7 +76,7 @@ struct Networks: ParsableCommand {
     @Argument(help: "The other IPv4 or IPv6 CIDR network prefix.")
     var second: String
 
-    @Option(name: .shortAndLong, help: "Output format: list or json.")
+    @Option(name: .shortAndLong, help: "Output format: list, json, or tree.")
     var output: OutputFormat = .list
 
     mutating func run() throws {
@@ -137,24 +137,22 @@ extension CIDRWalk {
             let rangeStart = min(start, end)
             let rangeEnd = max(start, end)
             return try render(
-                IPv4Network.summarize(from: rangeStart, to: rangeEnd).map(\.description),
+                IPv4Network.summarize(from: rangeStart, to: rangeEnd),
                 mode: .addresses,
-                family: "IPv4",
-                inputs: [start.description, end.description],
-                rangeStart: rangeStart.description,
-                rangeEnd: rangeEnd.description,
+                inputs: [start, end],
+                rangeStart: rangeStart,
+                rangeEnd: rangeEnd,
                 output: output
             )
         case (.v6(let start), .v6(let end)):
             let rangeStart = min(start, end)
             let rangeEnd = max(start, end)
             return try render(
-                IPv6Network.summarize(from: rangeStart, to: rangeEnd).map(\.description),
+                IPv6Network.summarize(from: rangeStart, to: rangeEnd),
                 mode: .addresses,
-                family: "IPv6",
-                inputs: [start.description, end.description],
-                rangeStart: rangeStart.description,
-                rangeEnd: rangeEnd.description,
+                inputs: [start, end],
+                rangeStart: rangeStart,
+                rangeEnd: rangeEnd,
                 output: output
             )
         default:
@@ -172,24 +170,22 @@ extension CIDRWalk {
             let rangeStart = first.first.address <= second.first.address ? first.first : second.first
             let rangeEnd = first.last.address >= second.last.address ? first.last : second.last
             return try render(
-                IPv4Network.summarize(covering: first, and: second).map(\.description),
+                IPv4Network.summarize(covering: first, and: second),
                 mode: .networks,
-                family: "IPv4",
-                inputs: [first.description, second.description],
-                rangeStart: rangeStart.description,
-                rangeEnd: rangeEnd.description,
+                inputs: [first, second],
+                rangeStart: rangeStart,
+                rangeEnd: rangeEnd,
                 output: output
             )
         case (.v6(let first), .v6(let second)):
             let rangeStart = first.first.address <= second.first.address ? first.first : second.first
             let rangeEnd = first.last.address >= second.last.address ? first.last : second.last
             return try render(
-                IPv6Network.summarize(covering: first, and: second).map(\.description),
+                IPv6Network.summarize(covering: first, and: second),
                 mode: .networks,
-                family: "IPv6",
-                inputs: [first.description, second.description],
-                rangeStart: rangeStart.description,
-                rangeEnd: rangeEnd.description,
+                inputs: [first, second],
+                rangeStart: rangeStart,
+                rangeEnd: rangeEnd,
                 output: output
             )
         default:
@@ -202,22 +198,28 @@ extension CIDRWalk {
         print(lines, terminator: lines.hasSuffix("\n") ? "" : "\n")
     }
 
-    private static func render(
-        _ prefixes: [String],
+    private static func render<Prefix, Input>(
+        _ prefixes: [Prefix],
         mode: SummaryMode,
-        family: String,
-        inputs: [String],
-        rangeStart: String,
-        rangeEnd: String,
+        inputs: [Input],
+        rangeStart: IPAddress<Prefix.Family>,
+        rangeEnd: IPAddress<Prefix.Family>,
         output: OutputFormat
-    ) throws -> String {
+    ) throws -> String
+    where Prefix: IPPrefix & Encodable,
+          Input: CIDR & Encodable,
+          Input.Family == Prefix.Family {
+        let prefixDescriptions = prefixes.map(\.description)
+
         switch output {
         case .list:
-            return prefixes.joined(separator: "\n")
+            return prefixDescriptions.joined(separator: "\n")
+        case .tree:
+            return renderTree(prefixes, descriptions: prefixDescriptions)
         case .json:
             let payload = SummaryPayload(
                 mode: mode,
-                family: family,
+                family: Prefix.Family.familyName,
                 inputs: inputs,
                 rangeStart: rangeStart,
                 rangeEnd: rangeEnd,
@@ -229,10 +231,27 @@ extension CIDRWalk {
             return String(decoding: data, as: UTF8.self)
         }
     }
+
+    private static func renderTree<P: IPPrefix>(_ prefixes: [P], descriptions: [String]) -> String {
+        guard !prefixes.isEmpty else { return "" }
+
+        let columnWidth = descriptions.map(\.count).max() ?? 0
+        let prefixLengths = prefixes.map(\.prefixLength.intValue)
+        let maximumPrefixLength = prefixLengths.max() ?? 0
+        let indentationUnit = columnWidth + 1
+
+        return zip(descriptions, prefixLengths)
+            .map { description, prefixLength in
+                let indentation = (maximumPrefixLength - prefixLength) * indentationUnit
+                return String(repeating: " ", count: indentation) + description
+            }
+            .joined(separator: "\n")
+    }
 }
 
 enum OutputFormat: String, ExpressibleByArgument {
     case list
+    case tree
     case json
 }
 
@@ -241,11 +260,14 @@ enum SummaryMode: String, Encodable {
     case networks
 }
 
-private struct SummaryPayload: Encodable {
+private struct SummaryPayload<Prefix, Input>: Encodable
+where Prefix: IPPrefix & Encodable,
+      Input: CIDR & Encodable,
+      Input.Family == Prefix.Family {
     var mode: SummaryMode
     var family: String
-    var inputs: [String]
-    var rangeStart: String
-    var rangeEnd: String
-    var prefixes: [String]
+    var inputs: [Input]
+    var rangeStart: IPAddress<Prefix.Family>
+    var rangeEnd: IPAddress<Prefix.Family>
+    var prefixes: [Prefix]
 }

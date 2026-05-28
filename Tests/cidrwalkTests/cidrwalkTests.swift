@@ -45,6 +45,25 @@ func addressesSummarizesIPv4HostEndpointsAsList() throws {
     """)
 }
 
+@Test("Addresses command summarizes IPv4 host endpoints as a tree")
+func addressesSummarizesIPv4HostEndpointsAsTree() throws {
+    let startAddress = try CIDRWalk.parseHostEndpoint("192.0.2.1/32", label: "start")
+    let endAddress = try CIDRWalk.parseHostEndpoint("192.0.2.6/32", label: "end")
+
+    let output = try CIDRWalk.summarizeAddresses(
+        startAddress: startAddress,
+        endAddress: endAddress,
+        output: .tree
+    )
+
+    #expect(output == """
+    192.0.2.1/32
+                 192.0.2.2/31
+                 192.0.2.4/31
+    192.0.2.6/32
+    """)
+}
+
 @Test("Addresses command summarizes IPv6 host endpoints as a line list")
 func addressesSummarizesIPv6HostEndpointsAsList() throws {
     let startAddress = try CIDRWalk.parseHostEndpoint("2001:db8::1/128", label: "start")
@@ -208,6 +227,18 @@ func jsonOutputIncludesSemanticContext() throws {
     #expect(output.contains(#""rangeEnd" : "10.0.0.1/32""#))
     #expect(output.contains(#""rangeStart" : "10.0.0.1/32""#))
     #expect(output.contains(#""10.0.0.1/32""#))
+}
+
+@Test("Addresses command accepts tree output format")
+func addressesAcceptsTreeOutputFormat() throws {
+    let command = try Addresses.parse([
+        "192.0.2.1/32",
+        "192.0.2.2/32",
+        "--output",
+        "tree"
+    ])
+
+    #expect(command.output == .tree)
 }
 
 @Test("Root command rejects positional inputs without a subcommand")
