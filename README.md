@@ -35,27 +35,13 @@ inputs, including adjacent, nested, or reversed networks.
 
 ### Homebrew
 
-Install the released command-line tool from the RouteObjects tap:
+Install the released command-line tool from the RouteObjects tap on macOS or
+Linux. Homebrew pours a prebuilt binary; no Swift toolchain or Xcode is required
+at install time.
 
 ```bash
 brew install RouteObjects/tap/cidrwalk
-```
-
-### Build From Source
-
-Clone the repository and run the executable with SwiftPM:
-
-```bash
-git clone https://github.com/RouteObjects/cidrwalk.git
-cd cidrwalk
-swift run cidrwalk --help
-```
-
-Check the installed version with either version flag:
-
-```bash
 cidrwalk --version
-cidrwalk -v
 ```
 
 ### Address Endpoints
@@ -64,7 +50,7 @@ Use `addresses` when the inputs are host endpoints. Prefix notation is required,
 and only host-length prefix lengths are accepted.
 
 ```bash
-swift run cidrwalk addresses 192.168.1.1/32 192.168.1.2/32
+cidrwalk addresses 192.168.1.1/32 192.168.1.2/32
 ```
 
 ```text
@@ -75,7 +61,7 @@ swift run cidrwalk addresses 192.168.1.1/32 192.168.1.2/32
 IPv6 host endpoints use `/128`:
 
 ```bash
-swift run cidrwalk addresses 2001:db8::1/128 2001:db8::f/128
+cidrwalk addresses 2001:db8::1/128 2001:db8::f/128
 ```
 
 ### Network Prefixes
@@ -84,7 +70,7 @@ Use `networks` when the inputs are CIDR network prefixes. The output covers both
 complete input networks, including reversed, nested, or adjacent inputs.
 
 ```bash
-swift run cidrwalk networks 192.0.2.0/24 192.0.3.0/24
+cidrwalk networks 192.0.2.0/24 192.0.3.0/24
 ```
 
 ```text
@@ -96,7 +82,7 @@ swift run cidrwalk networks 192.0.2.0/24 192.0.3.0/24
 JSON output is available with `--output json`:
 
 ```bash
-swift run cidrwalk addresses 192.168.1.1/32 192.168.1.189/32 --output json
+cidrwalk addresses 192.168.1.1/32 192.168.1.189/32 --output json
 ```
 
 ```json
@@ -133,7 +119,7 @@ prefix-length depth within the summarized result; it is a teaching
 visualization, not a proportional address-space diagram.
 
 ```bash
-swift run cidrwalk addresses 192.0.2.1/32 192.0.2.6/32 --output tree
+cidrwalk addresses 192.0.2.1/32 192.0.2.6/32 --output tree
 ```
 
 ```text
@@ -141,6 +127,16 @@ swift run cidrwalk addresses 192.0.2.1/32 192.0.2.6/32 --output tree
              192.0.2.2/31
              192.0.2.4/31
 192.0.2.6/32
+```
+
+### Build From Source
+
+Clone the repository and run the executable with SwiftPM:
+
+```bash
+git clone https://github.com/RouteObjects/cidrwalk.git
+cd cidrwalk
+swift run cidrwalk --help
 ```
 
 ## Testing

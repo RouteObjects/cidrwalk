@@ -16,7 +16,7 @@ import Testing
 
 @Test("Root command exposes release version")
 func rootCommandExposesReleaseVersion() {
-    #expect(CIDRWalk.version == "0.1.2")
+    #expect(CIDRWalk.version == "0.1.3")
 }
 
 @Test("Root command accepts long and short version flags")

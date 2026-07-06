@@ -17,7 +17,7 @@ import Foundation
 
 @main
 struct CIDRWalk: ParsableCommand {
-    static let version = "0.1.2"
+    static let version = "0.1.3"
 
     static let configuration = CommandConfiguration(
         commandName: "cidrwalk",

@@ -1,0 +1,107 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "*.*.*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: cidrwalk-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-macos:
+    name: macOS ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: aarch64
+            asset: cidrwalk-${{ github.ref_name }}-darwin-aarch64.tar.gz
+          - runner: macos-15-intel
+            arch: x86_64
+            asset: cidrwalk-${{ github.ref_name }}-darwin-x86_64.tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build release binary
+        run: swift build -c release --product cidrwalk
+
+      - name: Package tarball
+        run: |
+          install -m0755 .build/release/cidrwalk ./cidrwalk
+          tar czf "${{ matrix.asset }}" cidrwalk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          retention-days: 7
+
+  build-linux:
+    name: Linux ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    container: swift:6.3
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: x86_64
+            asset: cidrwalk-${{ github.ref_name }}-linux-x86_64.tar.gz
+          - runner: ubuntu-24.04-arm
+            arch: aarch64
+            asset: cidrwalk-${{ github.ref_name }}-linux-aarch64.tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Swift version
+        run: swift --version
+
+      - name: Build release binary
+        run: swift build -c release --product cidrwalk
+
+      - name: Package tarball
+        run: |
+          install -m0755 .build/release/cidrwalk ./cidrwalk
+          tar czf "${{ matrix.asset }}" cidrwalk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+          retention-days: 7
+
+  release:
+    name: Publish GitHub Release
+    needs: [build-macos, build-linux]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -la dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
