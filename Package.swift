@@ -24,7 +24,11 @@ let package = Package(
         .executable(name: "cidrwalk", targets: ["cidrwalk"]),
     ],
     dependencies: [
-        .package(url: "https://github.com/RouteObjects/swift-cidr.git", from: "0.1.0"),
+        // Keep this pre-1.0 dependency inside the reviewed 0.5 serialization line.
+        .package(
+            url: "https://github.com/RouteObjects/swift-cidr.git",
+            .upToNextMinor(from: "0.5.0")
+        ),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0"),
     ],
     targets: [

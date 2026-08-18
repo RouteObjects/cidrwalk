@@ -1,107 +1,456 @@
 name: Release
 
 on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Semantic version to dry-run, without a leading v
+        required: true
+        default: 0.2.0
+        type: string
   push:
     tags:
       - "*.*.*"
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: cidrwalk-release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
+  metadata:
+    name: Validate release metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Audit tracked release content
+        run: |
+          ./scripts/audit-release-content.sh tree
+          ./scripts/audit-release-content.sh dependencies
+
+      - name: Verify reviewed dependency boundary
+        run: |
+          grep -Fq '.upToNextMinor(from: "0.5.0")' Package.swift
+          grep -Fq '"version" : "0.5.0"' Package.resolved
+          grep -Fq \
+            '"revision" : "fd5116cef64544dc1f2bab9e93de4e1a7bb57dbb"' \
+            Package.resolved
+
+      - name: Validate version and signed release tag
+        id: version
+        env:
+          DISPATCH_VERSION: ${{ inputs.version }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            version="${GITHUB_REF_NAME}"
+          else
+            version="${DISPATCH_VERSION}"
+          fi
+
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            printf 'Invalid release version: %s\n' "${version}" >&2
+            exit 1
+          fi
+
+          grep -Fq \
+            "static let version = \"${version}\"" \
+            Sources/cidrwalk/cidrwalk.swift
+          test -f "Documentation/ReleaseNotes/${version}.md"
+
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            tag_object="$(git rev-parse "${GITHUB_REF}^{tag}")" || {
+              printf 'Release tag must be annotated and signed: %s\n' "${version}" >&2
+              exit 1
+            }
+
+            verified="$(
+              gh api "repos/${GITHUB_REPOSITORY}/git/tags/${tag_object}" \
+                --jq '.verification.verified'
+            )"
+            if [[ "${verified}" != "true" ]]; then
+              printf 'GitHub did not verify the signature on tag %s.\n' "${version}" >&2
+              exit 1
+            fi
+
+            git fetch --no-tags origin main
+            tagged_commit="$(git rev-list -n 1 "${GITHUB_REF}")"
+            git merge-base --is-ancestor "${tagged_commit}" origin/main || {
+              printf 'Release tag %s is not reachable from origin/main.\n' "${version}" >&2
+              exit 1
+            }
+          fi
+
+          printf 'version=%s\n' "${version}" >>"${GITHUB_OUTPUT}"
+
   build-macos:
     name: macOS ${{ matrix.arch }}
+    needs: metadata
     runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: macos-15
             arch: aarch64
-            asset: cidrwalk-${{ github.ref_name }}-darwin-aarch64.tar.gz
+            uname_arch: arm64
           - runner: macos-15-intel
             arch: x86_64
-            asset: cidrwalk-${{ github.ref_name }}-darwin-x86_64.tar.gz
+            uname_arch: x86_64
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Swift version
-        run: swift --version
+      - name: Verify native runner architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.uname_arch }}
+        run: test "$(uname -m)" = "${EXPECTED_ARCH}"
+
+      - name: Resolve and verify locked dependencies
+        run: |
+          swift package resolve
+          git diff --exit-code -- Package.resolved
 
       - name: Build release binary
-        run: swift build -c release --product cidrwalk
-
-      - name: Package tarball
         run: |
-          install -m0755 .build/release/cidrwalk ./cidrwalk
-          tar czf "${{ matrix.asset }}" cidrwalk
+          # CHANGE: Remap compilation roots before stripping so public binaries do not
+          # retain the hosted runner's absolute workspace path.
+          swift build -c release --product cidrwalk \
+            -Xswiftc -file-prefix-map \
+            -Xswiftc "${GITHUB_WORKSPACE}/.build=SwiftPMBuild" \
+            -Xswiftc -file-prefix-map \
+            -Xswiftc "${GITHUB_WORKSPACE}=Source" \
+            -Xcc "-ffile-prefix-map=${GITHUB_WORKSPACE}/.build=SwiftPMBuild" \
+            -Xcc "-ffile-prefix-map=${GITHUB_WORKSPACE}=Source"
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Validate binary version and deterministic IPv6 output
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          binary="$(swift build -c release --show-bin-path)/cidrwalk"
+          strip -S -x "${binary}"
+          test "$("${binary}" --version)" = "${VERSION}"
+          "${binary}" --help >/dev/null
+          "${binary}" addresses 2001:db8::1/128 2001:db8::3/128 >actual-output.txt
+          printf '%s\n' '2001:db8::1/128' '2001:db8::2/127' >expected-output.txt
+          cmp expected-output.txt actual-output.txt
+          ./scripts/audit-release-content.sh binary "${binary}"
+
+      - name: Package release archive
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          asset="cidrwalk-${VERSION}-darwin-${ARCH}.tar.gz"
+          stage="$(mktemp -d)"
+          install -m 0755 \
+            "$(swift build -c release --show-bin-path)/cidrwalk" \
+            "${stage}/cidrwalk"
+          install -m 0644 LICENSE THIRD_PARTY_NOTICES.txt "${stage}/"
+          COPYFILE_DISABLE=1 tar -C "${stage}" -czf "${asset}" \
+            cidrwalk LICENSE THIRD_PARTY_NOTICES.txt
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ matrix.asset }}
-          path: ${{ matrix.asset }}
+          name: release-darwin-${{ matrix.arch }}
+          path: cidrwalk-${{ needs.metadata.outputs.version }}-darwin-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
           retention-days: 7
 
   build-linux:
     name: Linux ${{ matrix.arch }}
+    needs: metadata
     runs-on: ${{ matrix.runner }}
-    container: swift:6.3
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
         include:
           - runner: ubuntu-24.04
             arch: x86_64
-            asset: cidrwalk-${{ github.ref_name }}-linux-x86_64.tar.gz
+            docker_platform: linux/amd64
+            uname_arch: x86_64
           - runner: ubuntu-24.04-arm
             arch: aarch64
-            asset: cidrwalk-${{ github.ref_name }}-linux-aarch64.tar.gz
+            docker_platform: linux/arm64
+            uname_arch: aarch64
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Swift version
-        run: swift --version
+      - name: Verify native runner architecture
+        env:
+          EXPECTED_ARCH: ${{ matrix.uname_arch }}
+        run: test "$(uname -m)" = "${EXPECTED_ARCH}"
 
-      - name: Build release binary
-        run: swift build -c release --product cidrwalk
-
-      - name: Package tarball
+      - name: Build with Swift 6.1 on Ubuntu 22.04
+        env:
+          DOCKER_PLATFORM: ${{ matrix.docker_platform }}
         run: |
-          install -m0755 .build/release/cidrwalk ./cidrwalk
-          tar czf "${{ matrix.asset }}" cidrwalk
+          # swift:6.1-jammy multi-architecture manifest, resolved 2026-07-24.
+          docker run --rm \
+            --platform "${DOCKER_PLATFORM}" \
+            --user "$(id -u):$(id -g)" \
+            --env XDG_CACHE_HOME=/tmp/swift-cache \
+            --env CLANG_MODULE_CACHE_PATH=/workspace/.build/clang-module-cache \
+            --volume "${PWD}:/workspace" \
+            --workdir /workspace \
+            swift:6.1-jammy@sha256:12be34a341945adb64914405ed7b568fcb2d35edbd63a3755007e47dce59456e \
+            bash -c \
+              'mkdir -p "${XDG_CACHE_HOME}" "${CLANG_MODULE_CACHE_PATH}" &&
+               swift --version &&
+               # CHANGE: Remap compile-time roots and statically include the Swift runtime.
+               swift build -c release --static-swift-stdlib --product cidrwalk \
+                 -Xswiftc -debug-prefix-map \
+                 -Xswiftc /workspace=Source \
+                 -Xcc -ffile-prefix-map=/workspace/.build=SwiftPMBuild'
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Verify locked resolution
+        run: git diff --exit-code -- Package.resolved
+
+      - name: Strip and validate release binary
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          binary=".build/release/cidrwalk"
+          strip --strip-unneeded "${binary}"
+          test "$("${binary}" --version)" = "${VERSION}"
+          "${binary}" --help >/dev/null
+          "${binary}" addresses 2001:db8::1/128 2001:db8::3/128 >actual-output.txt
+          printf '%s\n' '2001:db8::1/128' '2001:db8::2/127' >expected-output.txt
+          cmp expected-output.txt actual-output.txt
+          ./scripts/audit-release-content.sh binary "${binary}"
+
+          readelf -d "${binary}" >elf-dynamic-section.txt
+          if grep -E 'NEEDED.*(libswift|libFoundation|libdispatch|libBlocksRuntime)' \
+              elf-dynamic-section.txt; then
+            printf 'Release binary still requires a Swift runtime shared library.\n' >&2
+            exit 1
+          fi
+
+      - name: Package release archive
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          asset="cidrwalk-${VERSION}-linux-${ARCH}.tar.gz"
+          stage="$(mktemp -d)"
+          install -m 0755 .build/release/cidrwalk "${stage}/cidrwalk"
+          install -m 0644 LICENSE THIRD_PARTY_NOTICES.txt "${stage}/"
+          tar -C "${stage}" -czf "${asset}" \
+            cidrwalk LICENSE THIRD_PARTY_NOTICES.txt
+
+      - name: Exercise archive without a Swift installation
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          DOCKER_PLATFORM: ${{ matrix.docker_platform }}
+        run: |
+          set -euo pipefail
+          stage="$(mktemp -d)"
+          tar -C "${stage}" -xzf "cidrwalk-${VERSION}-linux-${ARCH}.tar.gz"
+          # ubuntu:22.04 multi-architecture manifest, resolved 2026-07-24.
+          image="ubuntu:22.04@sha256:0e0a0fc6d18feda9db1590da249ac93e8d5abfea8f4c3c0c849ce512b5ef8982"
+          test "$(docker run --rm \
+            --platform "${DOCKER_PLATFORM}" \
+            --volume "${stage}:/opt/cidrwalk:ro" \
+            "${image}" \
+            /opt/cidrwalk/cidrwalk --version)" = "${VERSION}"
+          docker run --rm \
+            --platform "${DOCKER_PLATFORM}" \
+            --volume "${stage}:/opt/cidrwalk:ro" \
+            "${image}" \
+            /opt/cidrwalk/cidrwalk --help >/dev/null
+          docker run --rm \
+            --platform "${DOCKER_PLATFORM}" \
+            --volume "${stage}:/opt/cidrwalk:ro" \
+            "${image}" \
+            /opt/cidrwalk/cidrwalk \
+              addresses 2001:db8::1/128 2001:db8::3/128 >archive-output.txt
+          printf '%s\n' '2001:db8::1/128' '2001:db8::2/127' >expected-output.txt
+          cmp expected-output.txt archive-output.txt
+
+      - name: Upload release archive
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: ${{ matrix.asset }}
-          path: ${{ matrix.asset }}
+          name: release-linux-${{ matrix.arch }}
+          path: cidrwalk-${{ needs.metadata.outputs.version }}-linux-${{ matrix.arch }}.tar.gz
+          if-no-files-found: error
           retention-days: 7
 
-  release:
-    name: Publish GitHub Release
-    needs: [build-macos, build-linux]
-    runs-on: ubuntu-latest
+  assemble:
+    name: Assemble and inspect release
+    needs: [metadata, build-macos, build-linux]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
 
     steps:
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
+      - name: Checkout release audit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download release archives
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
+          pattern: release-*
           path: dist
           merge-multiple: true
 
-      - name: List release assets
-        run: ls -la dist
+      - name: Validate asset set and write checksums
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          expected=(
+            "cidrwalk-${VERSION}-darwin-aarch64.tar.gz"
+            "cidrwalk-${VERSION}-darwin-x86_64.tar.gz"
+            "cidrwalk-${VERSION}-linux-aarch64.tar.gz"
+            "cidrwalk-${VERSION}-linux-x86_64.tar.gz"
+          )
 
-      - name: Publish release
-        uses: softprops/action-gh-release@v2
+          test "$(find dist -maxdepth 1 -name 'cidrwalk-*.tar.gz' -type f | wc -l)" -eq 4
+          for asset in "${expected[@]}"; do
+            test -s "dist/${asset}"
+            tar -tzf "dist/${asset}" >archive-contents.txt
+            grep -qx 'cidrwalk' archive-contents.txt
+            grep -qx 'LICENSE' archive-contents.txt
+            grep -qx 'THIRD_PARTY_NOTICES.txt' archive-contents.txt
+            if grep -Ev \
+                '^(cidrwalk|LICENSE|THIRD_PARTY_NOTICES[.]txt)$' \
+                archive-contents.txt; then
+              printf 'Unexpected file in %s.\n' "${asset}" >&2
+              exit 1
+            fi
+
+            stage="$(mktemp -d)"
+            tar -C "${stage}" -xzf "dist/${asset}"
+            test -x "${stage}/cidrwalk"
+            ./scripts/audit-release-content.sh binary "${stage}/cidrwalk"
+          done
+
+          (
+            cd dist
+            sha256sum "${expected[@]}" >SHA256SUMS
+            sha256sum --check SHA256SUMS
+          )
+
+      - name: Upload assembled release
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          files: dist/*
+          name: cidrwalk-${{ needs.metadata.outputs.version }}-release
+          path: |
+            dist/cidrwalk-*.tar.gz
+            dist/SHA256SUMS
+          if-no-files-found: error
+          retention-days: 7
+
+  draft-release:
+    name: Create draft GitHub release
+    if: github.event_name == 'push'
+    needs: [metadata, assemble]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout release notes
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Download assembled release
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: cidrwalk-${{ needs.metadata.outputs.version }}-release
+          path: dist
+
+      - name: Create or update draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          expected_assets=(
+            "cidrwalk-${VERSION}-darwin-aarch64.tar.gz"
+            "cidrwalk-${VERSION}-darwin-x86_64.tar.gz"
+            "cidrwalk-${VERSION}-linux-aarch64.tar.gz"
+            "cidrwalk-${VERSION}-linux-x86_64.tar.gz"
+            "SHA256SUMS"
+          )
+
+          if gh release view "${VERSION}" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            is_draft="$(
+              gh release view "${VERSION}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --json isDraft \
+                --jq '.isDraft'
+            )"
+            if [[ "${is_draft}" != "true" ]]; then
+              printf 'Refusing to replace assets on published release %s.\n' "${VERSION}" >&2
+              exit 1
+            fi
+
+            # CHANGE: Remove obsolete draft assets before replacing the validated set so a
+            # later manual publish cannot expose an artifact left behind by an older run.
+            while IFS= read -r existing_asset; do
+              keep=false
+              for expected_asset in "${expected_assets[@]}"; do
+                if [[ "${existing_asset}" == "${expected_asset}" ]]; then
+                  keep=true
+                  break
+                fi
+              done
+              if [[ "${keep}" != "true" ]]; then
+                gh release delete-asset "${VERSION}" "${existing_asset}" \
+                  --repo "${GITHUB_REPOSITORY}" \
+                  --yes
+              fi
+            done < <(
+              gh release view "${VERSION}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --json assets \
+                --jq '.assets[].name'
+            )
+
+            gh release upload "${VERSION}" dist/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --clobber
+            gh release edit "${VERSION}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --notes-file "Documentation/ReleaseNotes/${VERSION}.md" \
+              --title "cidrwalk ${VERSION}"
+          else
+            gh release create "${VERSION}" dist/* \
+              --repo "${GITHUB_REPOSITORY}" \
+              --draft \
+              --verify-tag \
+              --notes-file "Documentation/ReleaseNotes/${VERSION}.md" \
+              --title "cidrwalk ${VERSION}"
+          fi
+
+          printf '%s\n' "${expected_assets[@]}" | LC_ALL=C sort >expected-assets.txt
+          gh release view "${VERSION}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --json assets \
+            --jq '.assets[].name' \
+            | LC_ALL=C sort >actual-assets.txt
+          diff -u expected-assets.txt actual-assets.txt

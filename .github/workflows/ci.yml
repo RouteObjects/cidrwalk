@@ -21,13 +21,62 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # CHANGE: Container steps do not inherit Checkout's host-level safe-directory setting.
+      - name: Trust checked-out workspace
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
 
       - name: Swift Version
         run: swift --version
 
       - name: Resolve Dependencies
         run: swift package resolve
+
+      - name: Verify locked resolution
+        run: git diff --exit-code -- Package.resolved
+
+      - name: Audit tracked release content
+        run: |
+          ./scripts/audit-release-content.sh tree
+          ./scripts/audit-release-content.sh dependencies
+
+      - name: Test
+        run: ./scripts/test.sh
+
+      - name: Release build
+        run: swift build -c release --product cidrwalk
+
+  linux-minimum:
+    name: Linux minimum toolchain (Swift 6.1)
+    runs-on: ubuntu-24.04
+    # swift:6.1-jammy multi-architecture manifest, resolved 2026-07-24.
+    container: >-
+      swift:6.1-jammy@sha256:12be34a341945adb64914405ed7b568fcb2d35edbd63a3755007e47dce59456e
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # CHANGE: Prove the declared package floor in the same environment used for Linux releases.
+      - name: Trust checked-out workspace
+        run: git config --global --add safe.directory "${GITHUB_WORKSPACE}"
+
+      - name: Swift Version
+        run: swift --version
+
+      - name: Resolve Dependencies
+        run: swift package resolve
+
+      - name: Verify locked resolution
+        run: git diff --exit-code -- Package.resolved
+
+      - name: Audit locked dependency notices
+        run: ./scripts/audit-release-content.sh dependencies
+
+      - name: Debug build
+        run: swift build --product cidrwalk
 
       - name: Test
         run: ./scripts/test.sh

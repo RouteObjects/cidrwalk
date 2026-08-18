@@ -19,6 +19,11 @@ The command is intentionally narrow and teaching-oriented:
 Both inputs must be from the same IP address family. Reversed input order is
 normalized at the CLI boundary before calling into `swift-cidr`.
 
+Version 0.2 adopts `swift-cidr` 0.5's RFC 5952 IPv6 spelling for list, tree,
+and JSON output. IPv6 values are compressed deterministically, for example
+`2001:db8::1/128`, while aggregation semantics and the CLI grammar remain
+unchanged.
+
 ## CIDR Aggregation
 
 CIDR summarization converts an inclusive address range, or the envelope around
@@ -62,6 +67,13 @@ IPv6 host endpoints use `/128`:
 
 ```bash
 cidrwalk addresses 2001:db8::1/128 2001:db8::f/128
+```
+
+```text
+2001:db8::1/128
+2001:db8::2/127
+2001:db8::4/126
+2001:db8::8/125
 ```
 
 ### Network Prefixes
@@ -119,14 +131,14 @@ prefix-length depth within the summarized result; it is a teaching
 visualization, not a proportional address-space diagram.
 
 ```bash
-cidrwalk addresses 192.0.2.1/32 192.0.2.6/32 --output tree
+cidrwalk addresses 2001:db8::1/128 2001:db8::8/128 --output tree
 ```
 
 ```text
-192.0.2.1/32
-             192.0.2.2/31
-             192.0.2.4/31
-192.0.2.6/32
+2001:db8::1/128
+                2001:db8::2/127
+                                2001:db8::4/126
+2001:db8::8/128
 ```
 
 ### Build From Source
@@ -139,6 +151,19 @@ cd cidrwalk
 swift run cidrwalk --help
 ```
 
+The 0.2 package accepts `swift-cidr` versions in the `0.5.x` line
+(`>= 0.5.0` and `< 0.6.0`). This protects the command's tested serialization
+contract from an unreviewed pre-1.0 minor update. Building requires Swift 6.1
+or newer.
+
+## Release Archives
+
+Each release provides native macOS and Linux archives for arm64 and x86-64.
+Every archive contains the `cidrwalk` executable, `LICENSE`, and
+`THIRD_PARTY_NOTICES.txt`. Linux executables statically include the Swift
+runtime and are exercised in a clean Ubuntu 22.04 container without Swift.
+The release also includes `SHA256SUMS` covering all four archives.
+
 ## Testing
 
 Use the repository test wrapper:
@@ -150,3 +175,13 @@ Use the repository test wrapper:
 The wrapper still runs `swift test`. It only adds the Swift Testing framework
 and runtime paths needed by standalone Command Line Tools installations where
 plain `swift test` cannot locate `Testing.framework`.
+
+Maintainers can validate a committed release candidate from a clean worktree:
+
+```bash
+./scripts/check-release.sh 0.2.0
+```
+
+The release workflow's manual dispatch builds and inspects the same four
+artifacts without creating a GitHub Release. A verified signed tag creates a
+draft Release for separate review and publication.

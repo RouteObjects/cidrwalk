@@ -16,7 +16,7 @@ import Testing
 
 @Test("Root command exposes release version")
 func rootCommandExposesReleaseVersion() {
-    #expect(CIDRWalk.version == "0.1.3")
+    #expect(CIDRWalk.version == "0.2.0")
 }
 
 @Test("Root command accepts long and short version flags")
@@ -76,10 +76,29 @@ func addressesSummarizesIPv6HostEndpointsAsList() throws {
     )
 
     #expect(output == """
-    2001:db8:0:0:0:0:0:1/128
-    2001:db8:0:0:0:0:0:2/127
-    2001:db8:0:0:0:0:0:4/126
-    2001:db8:0:0:0:0:0:8/125
+    2001:db8::1/128
+    2001:db8::2/127
+    2001:db8::4/126
+    2001:db8::8/125
+    """)
+}
+
+@Test("Addresses command summarizes IPv6 host endpoints as an exact tree")
+func addressesSummarizesIPv6HostEndpointsAsExactTree() throws {
+    let startAddress = try CIDRWalk.parseHostEndpoint("2001:db8::1/128", label: "start")
+    let endAddress = try CIDRWalk.parseHostEndpoint("2001:db8::8/128", label: "end")
+
+    let output = try CIDRWalk.summarizeAddresses(
+        startAddress: startAddress,
+        endAddress: endAddress,
+        output: .tree
+    )
+
+    #expect(output == """
+    2001:db8::1/128
+                    2001:db8::2/127
+                                    2001:db8::4/126
+    2001:db8::8/128
     """)
 }
 
@@ -185,7 +204,36 @@ func networksSummarizesAdjacentIPv6Networks() throws {
         output: .list
     )
 
-    #expect(output == "2001:db8:0:0:0:0:0:0/126")
+    #expect(output == "2001:db8::/126")
+}
+
+@Test("IPv6 JSON output uses the exact RFC 5952 serialization contract")
+func ipv6JSONOutputUsesExactRFC5952Serialization() throws {
+    let startAddress = try CIDRWalk.parseHostEndpoint("2001:db8::1/128", label: "start")
+    let endAddress = try CIDRWalk.parseHostEndpoint("2001:db8::3/128", label: "end")
+
+    let output = try CIDRWalk.summarizeAddresses(
+        startAddress: startAddress,
+        endAddress: endAddress,
+        output: .json
+    )
+
+    #expect(output == """
+    {
+      "family" : "IPv6",
+      "inputs" : [
+        "2001:db8::1/128",
+        "2001:db8::3/128"
+      ],
+      "mode" : "addresses",
+      "prefixes" : [
+        "2001:db8::1/128",
+        "2001:db8::2/127"
+      ],
+      "rangeEnd" : "2001:db8::3/128",
+      "rangeStart" : "2001:db8::1/128"
+    }
+    """)
 }
 
 @Test("Networks command rejects malformed input")
