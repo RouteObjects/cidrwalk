@@ -92,7 +92,7 @@ audit_dependency_notices() {
     done <<'EOF'
 swift-argument-parser|Swift Argument Parser|1.7.1|626b5b7b2f45e1b0b1c6f4a309296d1d21d7311b
 swift-atomics|Swift Atomics|1.3.0|b601256eab081c0f92f059e12818ac1d4f178ff7
-swift-cidr|swift-cidr|0.5.0|fd5116cef64544dc1f2bab9e93de4e1a7bb57dbb
+swift-cidr|swift-cidr|0.9.0|a7f661a313d2e9d97516aaeeb4fb0031a229fb02
 swift-collections|Swift Collections|1.5.1|fea17c02d767f46b23070fdfdacc28a03a39232a
 swift-nio|SwiftNIO|2.100.0|57c0a08a331aaea9f5d7a932ad94ef43be942a95
 swift-system|Swift System|1.6.4|7c6ad0fc39d0763e0b699210e4124afd5041c5df
