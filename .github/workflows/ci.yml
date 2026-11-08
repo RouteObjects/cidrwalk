@@ -48,11 +48,11 @@ jobs:
         run: swift build -c release --product cidrwalk
 
   linux-minimum:
-    name: Linux minimum toolchain (Swift 6.1)
+    name: Linux minimum toolchain (Swift 6.2)
     runs-on: ubuntu-24.04
-    # swift:6.1-jammy multi-architecture manifest, resolved 2026-07-24.
+    # swift:6.2-jammy multi-architecture manifest, resolved 2026-11-08.
     container: >-
-      swift:6.1-jammy@sha256:12be34a341945adb64914405ed7b568fcb2d35edbd63a3755007e47dce59456e
+      swift:6.2-jammy@sha256:7889980d84f47447d109990a6763f3a7997acf2d1059bbd7c56f7e0af6243f73
     timeout-minutes: 15
 
     steps:
