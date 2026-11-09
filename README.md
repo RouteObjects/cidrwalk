@@ -198,7 +198,7 @@ plain `swift test` cannot locate `Testing.framework`.
 Maintainers can validate a committed release candidate from a clean worktree:
 
 ```bash
-./scripts/check-release.sh 0.2.0
+./scripts/check-release.sh 0.3.0
 ```
 
 The release workflow's manual dispatch builds and inspects the same four
