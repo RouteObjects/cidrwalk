@@ -40,10 +40,10 @@ jobs:
 
       - name: Verify reviewed dependency boundary
         run: |
-          grep -Fq '.upToNextMinor(from: "0.5.0")' Package.swift
-          grep -Fq '"version" : "0.5.0"' Package.resolved
+          grep -Fq '.upToNextMinor(from: "0.9.0")' Package.swift
+          grep -Fq '"version" : "0.9.0"' Package.resolved
           grep -Fq \
-            '"revision" : "fd5116cef64544dc1f2bab9e93de4e1a7bb57dbb"' \
+            '"revision" : "a7f661a313d2e9d97516aaeeb4fb0031a229fb02"' \
             Package.resolved
 
       - name: Validate version and signed release tag
@@ -100,6 +100,9 @@ jobs:
     needs: metadata
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 20
+    env:
+      # CHANGE: The macOS 15 runner default predates swift-cidr 0.9.0's Swift 6.2 floor.
+      DEVELOPER_DIR: /Applications/Xcode_26.3.app/Contents/Developer
     strategy:
       fail-fast: false
       matrix:
@@ -201,11 +204,11 @@ jobs:
           EXPECTED_ARCH: ${{ matrix.uname_arch }}
         run: test "$(uname -m)" = "${EXPECTED_ARCH}"
 
-      - name: Build with Swift 6.1 on Ubuntu 22.04
+      - name: Build with Swift 6.2 on Ubuntu 22.04
         env:
           DOCKER_PLATFORM: ${{ matrix.docker_platform }}
         run: |
-          # swift:6.1-jammy multi-architecture manifest, resolved 2026-07-24.
+          # swift:6.2-jammy multi-architecture manifest, resolved 2026-11-08.
           docker run --rm \
             --platform "${DOCKER_PLATFORM}" \
             --user "$(id -u):$(id -g)" \
@@ -213,7 +216,7 @@ jobs:
             --env CLANG_MODULE_CACHE_PATH=/workspace/.build/clang-module-cache \
             --volume "${PWD}:/workspace" \
             --workdir /workspace \
-            swift:6.1-jammy@sha256:12be34a341945adb64914405ed7b568fcb2d35edbd63a3755007e47dce59456e \
+            swift:6.2-jammy@sha256:7889980d84f47447d109990a6763f3a7997acf2d1059bbd7c56f7e0af6243f73 \
             bash -c \
               'mkdir -p "${XDG_CACHE_HOME}" "${CLANG_MODULE_CACHE_PATH}" &&
                swift --version &&

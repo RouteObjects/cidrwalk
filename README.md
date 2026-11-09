@@ -19,10 +19,8 @@ The command is intentionally narrow and teaching-oriented:
 Both inputs must be from the same IP address family. Reversed input order is
 normalized at the CLI boundary before calling into `swift-cidr`.
 
-Version 0.2 adopts `swift-cidr` 0.5's RFC 5952 IPv6 spelling for list, tree,
-and JSON output. IPv6 values are compressed deterministically, for example
-`2001:db8::1/128`, while aggregation semantics and the CLI grammar remain
-unchanged.
+IPv6 values use deterministic RFC 5952 compressed text in list, tree, and JSON
+output, for example `2001:db8::1/128`.
 
 ## CIDR Aggregation
 
@@ -33,8 +31,9 @@ when the range starts or ends inside a larger boundary.
 
 The `addresses` subcommand requires `/32` for IPv4 and `/128` for IPv6 because
 those prefix lengths identify exact host endpoints. The `networks` subcommand
-accepts CIDR network prefixes and summarizes the full envelope that covers both
-inputs, including adjacent, nested, or reversed networks.
+accepts distinct CIDR network prefixes that do not contain one another and
+summarizes the full envelope that covers both inputs. Adjacent or separated
+networks are accepted in either order.
 
 ## Usage
 
@@ -79,7 +78,11 @@ cidrwalk addresses 2001:db8::1/128 2001:db8::f/128
 ### Network Prefixes
 
 Use `networks` when the inputs are CIDR network prefixes. The output covers both
-complete input networks, including reversed, nested, or adjacent inputs.
+complete input networks and any gap between them. The networks must use the same
+address family, be unequal, and neither may contain the other. Equality is checked
+after canonicalizing the inputs, so `10.0.0.1/24` and `10.0.0.0/24` are rejected
+as the same network. Validation errors are written to stderr with a nonzero exit
+status and no summary on stdout.
 
 ```bash
 cidrwalk networks 192.0.2.0/24 192.0.3.0/24
@@ -124,6 +127,22 @@ cidrwalk addresses 192.168.1.1/32 192.168.1.189/32 --output json
 }
 ```
 
+In network mode, `rangeStart` is the lowest first address and `rangeEnd` is the
+highest last address across the two inputs. With swift-cidr 0.9, each JSON boundary
+retains the prefix length of the input network that supplies it. These fields are
+contextual address values; their prefix lengths may differ.
+
+| Network inputs | `rangeStart` | `rangeEnd` |
+| --- | --- | --- |
+| `10.0.0.0/24`, `10.0.2.0/25` | `10.0.0.0/24` | `10.0.2.127/25` |
+| `2001:db8::/126`, `2001:db8::8/127` | `2001:db8::/126` | `2001:db8::9/127` |
+
+This intentionally changes the network-mode JSON boundary convention from earlier
+releases using swift-cidr 0.5, which emitted host-length prefixes. The `inputs`
+array preserves canonical networks in command-line order. Reversing accepted
+inputs leaves the boundary values and summarized prefixes unchanged. Address-mode
+JSON continues to use its required `/32` or `/128` host endpoints.
+
 ### Tree
 
 Tree output is available with `--output tree`. Indentation is based on
@@ -151,9 +170,9 @@ cd cidrwalk
 swift run cidrwalk --help
 ```
 
-The 0.2 package accepts `swift-cidr` versions in the `0.5.x` line
-(`>= 0.5.0` and `< 0.6.0`). This protects the command's tested serialization
-contract from an unreviewed pre-1.0 minor update. Building requires Swift 6.1
+The package accepts `swift-cidr` versions in the `0.9.x` line
+(`>= 0.9.0` and `< 0.10.0`). This protects the command's tested serialization
+contract from an unreviewed pre-1.0 minor update. Building requires Swift 6.2
 or newer.
 
 ## Release Archives
