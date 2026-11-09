@@ -1,4 +1,4 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.1
 
 //===----------------------------------------------------------------------===//
 //
@@ -24,10 +24,10 @@ let package = Package(
         .executable(name: "cidrwalk", targets: ["cidrwalk"]),
     ],
     dependencies: [
-        // Keep this pre-1.0 dependency inside the reviewed 0.9 compatibility line.
+        // Keep this pre-1.0 dependency inside the reviewed 0.5 serialization line.
         .package(
             url: "https://github.com/RouteObjects/swift-cidr.git",
-            .upToNextMinor(from: "0.9.0")
+            .upToNextMinor(from: "0.5.0")
         ),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.7.0"),
     ],

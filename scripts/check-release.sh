@@ -30,10 +30,10 @@ done
 
 grep -Fq "static let version = \"${VERSION}\"" Sources/cidrwalk/cidrwalk.swift ||
     fail "The executable version does not match ${VERSION}."
-grep -Fq '.upToNextMinor(from: "0.9.0")' Package.swift ||
-    fail "The swift-cidr requirement is not pinned to the 0.9 minor line."
-grep -Fq '"revision" : "a7f661a313d2e9d97516aaeeb4fb0031a229fb02"' Package.resolved ||
-    fail "Package.resolved does not contain the reviewed swift-cidr 0.9.0 revision."
+grep -Fq '.upToNextMinor(from: "0.5.0")' Package.swift ||
+    fail "The swift-cidr requirement is not pinned to the 0.5 minor line."
+grep -Fq '"revision" : "fd5116cef64544dc1f2bab9e93de4e1a7bb57dbb"' Package.resolved ||
+    fail "Package.resolved does not contain the reviewed swift-cidr 0.5.0 revision."
 
 while IFS= read -r swift_file; do
     grep -q 'SPDX-License-Identifier: Apache-2.0' "${swift_file}" ||

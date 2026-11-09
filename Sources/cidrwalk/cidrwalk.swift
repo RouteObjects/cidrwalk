@@ -167,7 +167,6 @@ extension CIDRWalk {
     ) throws -> String {
         switch (firstNetwork, secondNetwork) {
         case (.v4(let first), .v4(let second)):
-            try validateNetworkPair(first, second)
             let rangeStart = first.first.address <= second.first.address ? first.first : second.first
             let rangeEnd = first.last.address >= second.last.address ? first.last : second.last
             return try render(
@@ -179,7 +178,6 @@ extension CIDRWalk {
                 output: output
             )
         case (.v6(let first), .v6(let second)):
-            try validateNetworkPair(first, second)
             let rangeStart = first.first.address <= second.first.address ? first.first : second.first
             let rangeEnd = first.last.address >= second.last.address ? first.last : second.last
             return try render(
@@ -192,22 +190,6 @@ extension CIDRWalk {
             )
         default:
             throw ValidationError("first and second must use the same address family")
-        }
-    }
-
-    // Reject redundant inputs before rendering; retained boundaries keep their input prefixes.
-    private static func validateNetworkPair<Family: IPAddressFamily>(
-        _ first: IPNetwork<Family>,
-        _ second: IPNetwork<Family>
-    ) throws {
-        guard first != second else {
-            throw ValidationError("first and second must be different networks (both are \(first)).")
-        }
-        if first.contains(subnet: second) {
-            throw ValidationError("\(first) contains \(second); first and second must not contain one another.")
-        }
-        if second.contains(subnet: first) {
-            throw ValidationError("\(second) contains \(first); first and second must not contain one another.")
         }
     }
 
@@ -225,7 +207,7 @@ extension CIDRWalk {
         output: OutputFormat
     ) throws -> String
     where Prefix: IPPrefix & Encodable,
-          Input: CIDRForm & Encodable,
+          Input: CIDR & Encodable,
           Input.Family == Prefix.Family {
         let prefixDescriptions = prefixes.map(\.description)
 
@@ -280,7 +262,7 @@ enum SummaryMode: String, Encodable {
 
 private struct SummaryPayload<Prefix, Input>: Encodable
 where Prefix: IPPrefix & Encodable,
-      Input: CIDRForm & Encodable,
+      Input: CIDR & Encodable,
       Input.Family == Prefix.Family {
     var mode: SummaryMode
     var family: String

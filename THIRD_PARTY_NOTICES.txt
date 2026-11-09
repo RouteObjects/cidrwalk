@@ -12,8 +12,8 @@ Swift Argument Parser 1.7.1
   Source: https://github.com/apple/swift-argument-parser
   License: Apache License 2.0 with Runtime Library Exception
 
-swift-cidr 0.9.0 (CIDR product)
-  Revision: a7f661a313d2e9d97516aaeeb4fb0031a229fb02
+swift-cidr 0.5.0 (CIDR product)
+  Revision: fd5116cef64544dc1f2bab9e93de4e1a7bb57dbb
   Source: https://github.com/RouteObjects/swift-cidr
   License: Apache License 2.0
 
@@ -55,7 +55,7 @@ Runtime Library Exception to the Apache License 2.0
 
 The Apple packages identified above with the Runtime Library Exception use
 the following exception. Linux release binaries are built with the official
-Swift 6.2 Ubuntu 22.04 toolchain and statically link portions of the Swift
+Swift 6.1 Ubuntu 22.04 toolchain and statically link portions of the Swift
 runtime and standard libraries under the same license and exception.
 
     As an exception, if you use this Software to compile your source code and
